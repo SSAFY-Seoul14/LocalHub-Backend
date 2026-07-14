@@ -1,241 +1,421 @@
 # LocalHub Backend
 
-LocalHub 프로젝트의 FastAPI 기반 백엔드 서버입니다.
+FastAPI 기반 LocalHub 백엔드 프로젝트입니다.
 
-지도 좌표와 장소 데이터를 관리하며, SQLite 데이터베이스와 Kakao Maps API, OpenStreetMap API를 연동할 예정입니다.
+서울 관광 데이터를 SQLite에 저장하여 장소 검색 및 조회 API를 제공하며,
+게시판 CRUD와 Kakao Maps/OpenStreetMap API를 연동합니다.
 
-## 기술 스택
+---
 
-* Python 3.11
-* FastAPI
-* SQLite
-* SQLAlchemy
-* HTTPX
-* Pydantic Settings
+# Tech Stack
 
-## 프로젝트 구조
+- Python 3.11.x
+- FastAPI
+- SQLAlchemy
+- SQLite
+- HTTPX
+- Pydantic Settings
 
-```text
+---
+
+# Project Structure
+
+```
 LocalHub-Backend/
 ├── app/
-│   └── main.py
-├── venv/
+│   ├── __init__.py
+│   ├── main.py
+│   │
+│   ├── api/
+│   │   ├── __init__.py
+│   │   └── routes/
+│   │       ├── __init__.py
+│   │       ├── health.py
+│   │       ├── places.py
+│   │       ├── posts.py
+│   │       └── maps.py
+│   │
+│   ├── core/
+│   │   ├── __init__.py
+│   │   └── config.py
+│   │
+│   ├── db/
+│   │   ├── __init__.py
+│   │   └── database.py
+│   │
+│   ├── models/
+│   │   ├── __init__.py
+│   │   ├── place.py
+│   │   └── post.py
+│   │
+│   ├── schemas/
+│   │   ├── __init__.py
+│   │   ├── place.py
+│   │   ├── post.py
+│   │   └── map.py
+│   │
+│   ├── repositories/
+│   │   ├── __init__.py
+│   │   ├── place_repository.py
+│   │   └── post_repository.py
+│   │
+│   └── services/
+│       ├── __init__.py
+│       ├── place_service.py
+│       ├── post_service.py
+│       ├── kakao_service.py
+│       └── osm_service.py
+│
+├── data/
+│   ├── 서울/
+│   └── localhub.db
+│
+├── scripts/
+│   └── import_places.py
+│
+├── tests/
+│   ├── test_places.py
+│   └── test_posts.py
+│
+├── (.env)
 ├── .gitignore
-├── .env
-├── .env.example
 ├── requirements.txt
 └── README.md
 ```
 
-프로젝트가 진행되면서 API, 데이터베이스, 모델, 서비스 폴더를 추가할 예정입니다.
+---
 
-## 개발 환경
+# Directory Description
 
-* Python 3.11.x
-* 현재 기준 개발 버전: Python 3.11.9
+| Directory | Description |
+|------------|-------------|
+| app/api/routes | API Endpoint 정의 |
+| app/core | 프로젝트 설정 |
+| app/db | SQLite 연결 및 Session 관리 |
+| app/models | SQLAlchemy ORM 모델 |
+| app/schemas | Request / Response Schema |
+| app/repositories | DB 접근 계층 |
+| app/services | 비즈니스 로직 |
+| data | JSON 데이터 및 SQLite DB |
+| scripts | 데이터 적재 스크립트 |
+| tests | 테스트 코드 |
 
-Python 버전 확인:
+---
+
+# Development Environment
+
+| Item | Version |
+|------|---------|
+| Python | 3.11.x |
+| Database | SQLite |
+| Framework | FastAPI |
+
+Python 확인
 
 ```bash
 python --version
 ```
 
-## 프로젝트 실행 방법
+---
 
-### 1. 저장소 복제
+# Installation
+
+## 1. Clone Repository
 
 ```bash
-git clone <GitHub 저장소 주소>
+git clone <repository-url>
 ```
-
-저장소 폴더로 이동합니다.
 
 ```bash
 cd LocalHub-Backend
 ```
 
-### 2. 가상환경 생성
+---
 
-Windows Git Bash 기준:
+## 2. Create Virtual Environment
 
 ```bash
 python -m venv venv
 ```
 
-### 3. 가상환경 활성화
+---
 
-Git Bash:
+## 3. Activate Virtual Environment
+
+### Git Bash
 
 ```bash
 source venv/Scripts/activate
 ```
 
-PowerShell:
+### PowerShell
 
 ```powershell
 .\venv\Scripts\Activate.ps1
 ```
 
-CMD:
+---
 
-```cmd
-venv\Scripts\activate
-```
-
-가상환경이 활성화되면 터미널 앞에 `(venv)`가 표시됩니다.
-
-### 4. 패키지 설치
+## 4. Install Packages
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 5. 환경변수 설정
+---
 
-`.env.example` 파일을 복사하여 `.env` 파일을 생성합니다.
+# Database
 
-Git Bash:
+JSON 데이터를 SQLite 데이터베이스로 변환합니다.
+
+```
+data/
+└── 서울/
+    ├── 서울_관광지.json
+    ├── ...
+```
+
+데이터 적재
 
 ```bash
-cp .env.example .env
+python scripts/import_places.py
 ```
 
-Windows CMD:
+실행 후
 
-```cmd
-copy .env.example .env
+```
+data/localhub.db
 ```
 
-`.env` 파일에는 실제 API 키와 로컬 환경 설정을 입력합니다.
+가 생성됩니다.
 
-실제 `.env` 파일은 GitHub에 올리지 않습니다.
+---
 
-### 6. 서버 실행
+# Run Server
 
 ```bash
 fastapi dev app/main.py
 ```
 
-또는 다음 명령으로 실행할 수 있습니다.
+또는
 
 ```bash
 uvicorn app.main:app --reload
 ```
 
-### 7. 서버 확인
+---
 
-기본 서버 주소:
+# API Documentation
 
-```text
-http://127.0.0.1:8000
+Swagger
+
 ```
-
-Swagger API 문서:
-
-```text
 http://127.0.0.1:8000/docs
 ```
 
-ReDoc API 문서:
+ReDoc
 
-```text
+```
 http://127.0.0.1:8000/redoc
 ```
 
-## 가상환경 종료
+---
 
-```bash
-deactivate
+# Architecture
+
+```
+Frontend
+      │
+      ▼
+Router
+      │
+      ▼
+Service
+      │
+      ▼
+Repository
+      │
+      ▼
+SQLite
 ```
 
-## 패키지 추가 방법
+외부 지도 API 사용 시
 
-새 패키지를 설치할 때는 반드시 가상환경이 활성화된 상태에서 설치합니다.
-
-```bash
-pip install 패키지명
+```
+Frontend
+      │
+      ▼
+Router
+      │
+      ▼
+Service
+      │
+ ┌────┴────┐
+ ▼         ▼
+SQLite   Kakao / OSM API
 ```
 
-설치 후 현재 패키지 버전을 저장합니다.
+---
 
-```bash
-pip freeze > requirements.txt
+# Data Flow
+
+초기 데이터 적재
+
+```
+JSON
+    │
+    ▼
+import_places.py
+    │
+    ▼
+SQLite
 ```
 
-패키지를 추가한 팀원은 변경된 `requirements.txt`도 함께 커밋해야 합니다.
+서비스 실행
 
-## 데이터베이스 계획
-
-SQLite를 사용하여 기존 JSON 장소 데이터를 데이터베이스로 이전할 예정입니다.
-
-예상 작업 순서는 다음과 같습니다.
-
-```text
-JSON 데이터 구조 확인
-→ SQLite 테이블 설계
-→ SQLAlchemy 모델 작성
-→ SQLite 데이터베이스 생성
-→ JSON 데이터 적재
-→ FastAPI 조회 API 구현
+```
+SQLite
+    │
+    ▼
+Repository
+    │
+    ▼
+Service
+    │
+    ▼
+Router
+    │
+    ▼
+Frontend
 ```
 
-SQLite 데이터베이스 파일은 각 개발자의 로컬 환경에서 생성하며 GitHub에는 올리지 않습니다.
+---
 
-## 지도 API 계획
+# API Plan
 
-다음 외부 서비스를 연동할 예정입니다.
+## Health
 
-* Kakao Maps Local API
-* OpenStreetMap 기반 API
-* 필요 시 Nominatim 또는 Overpass API
+```
+GET /health
+```
 
-API 키는 소스 코드에 직접 작성하지 않고 `.env` 파일에서 관리합니다.
+---
 
-## Git 작업 규칙
+## Places
 
-작업을 시작하기 전에 원격 변경 내용을 가져옵니다.
+```
+GET /places
+GET /places/{id}
+GET /places/nearby
+GET /places/search
+```
+
+---
+
+## Maps
+
+```
+GET /maps/reverse-geocode
+GET /maps/search
+```
+
+---
+
+## Posts
+
+```
+GET /posts
+GET /posts/{id}
+
+POST /posts
+
+PUT /posts/{id}
+
+DELETE /posts/{id}
+```
+
+---
+
+# Git Workflow
+
+최신 코드 가져오기
 
 ```bash
 git pull origin main
 ```
 
-기능별 브랜치를 생성합니다.
+브랜치 생성
 
 ```bash
-git switch -c feature/기능이름
+git switch -c feature/기능명
 ```
 
-예시:
+예시
 
 ```bash
-git switch -c feature/database
 git switch -c feature/place-api
-git switch -c feature/map-api
+git switch -c feature/post-crud
 ```
 
-변경 사항을 저장합니다.
+작업 완료
 
 ```bash
 git add .
-git commit -m "feat: 작업 내용"
-git push origin 브랜치이름
+git commit -m "feat: 장소 조회 API"
+git push origin feature/place-api
 ```
 
-## 커밋 메시지 규칙
+---
 
-```text
-feat: 새로운 기능
-fix: 버그 수정
-docs: 문서 수정
-refactor: 코드 구조 개선
-test: 테스트 추가 또는 수정
-chore: 환경 설정 및 기타 작업
+# Commit Convention
+
+```
+feat
+fix
+docs
+refactor
+test
+chore
 ```
 
-예시:
+예시
 
-```text
-feat: FastAPI 서버 초기 설정
-docs: README 실행 방법 추가
-chore: requirements 파일 추가
 ```
+feat: 게시글 CRUD 구현
+feat: 장소 검색 API 구현
+fix: SQLite 조회 오류 수정
+docs: README 수정
+```
+
+---
+
+# Development Roadmap
+
+### Phase 1
+- [x] FastAPI 프로젝트 생성
+- [x] SQLite 구축
+- [x] JSON → SQLite 적재
+
+### Phase 2
+- [ ] Place Repository
+- [ ] Place API
+- [ ] Pagination
+- [ ] Keyword Search
+
+### Phase 3
+- [ ] Kakao Maps API 연동
+- [ ] OpenStreetMap 연동
+- [ ] 좌표 기반 주변 장소 검색
+
+### Phase 4
+- [ ] 게시판 CRUD
+- [ ] 게시글 검색
+- [ ] 댓글 기능
+- [ ] 이미지 업로드
+
+---
+
+# Data Source
+
+- 한국관광공사 TourAPI 4.0
+- 서울 관광 공공데이터
