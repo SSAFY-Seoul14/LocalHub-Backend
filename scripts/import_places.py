@@ -6,26 +6,34 @@ from typing import Any
 from sqlalchemy import select
 
 
-# scripts/import_places.py를 직접 실행해도 app 패키지를 찾을 수 있도록
-# 프로젝트 루트를 Python 경로에 추가한다.
+# scripts/import_places.py를 직접 실행해도
+# app 패키지를 찾을 수 있도록 프로젝트 루트를 Python 경로에 추가한다.
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from app.db.database import Place, SessionLocal, init_db  # noqa: E402
+
+from app.db.database import SessionLocal, init_db  # noqa: E402
+from app.models.place import Place  # noqa: E402
 
 
 DATA_DIR = PROJECT_ROOT / "data" / "서울"
 
 
 def to_float(value: Any) -> float | None:
-    """빈 문자열은 None으로, 좌표 문자열은 float로 변환한다."""
+    """
+    좌표 문자열을 실수로 변환한다.
+
+    빈 문자열이나 None은 좌표가 없는 것으로 보고 None을 반환한다.
+    """
     if value is None or value == "":
         return None
 
     try:
         return float(value)
     except (TypeError, ValueError) as exc:
-        raise ValueError(f"좌표를 숫자로 변환할 수 없습니다: {value!r}") from exc
+        raise ValueError(
+            f"좌표를 숫자로 변환할 수 없습니다: {value!r}"
+        ) from exc
 
 
 def to_int(value: Any) -> int:
@@ -33,7 +41,9 @@ def to_int(value: Any) -> int:
     try:
         return int(value)
     except (TypeError, ValueError) as exc:
-        raise ValueError(f"정수로 변환할 수 없습니다: {value!r}") from exc
+        raise ValueError(
+            f"정수로 변환할 수 없습니다: {value!r}"
+        ) from exc
 
 
 def build_place(
@@ -44,8 +54,13 @@ def build_place(
     content_type_id: int,
     source_file: str,
 ) -> Place:
-    """TourAPI JSON 항목 하나를 Place ORM 객체로 변환한다."""
-    item_type_id = item.get("contenttypeid", content_type_id)
+    """
+    TourAPI JSON 항목 하나를 Place SQLAlchemy 객체로 변환한다.
+    """
+    item_type_id = item.get(
+        "contenttypeid",
+        content_type_id,
+    )
 
     return Place(
         content_id=item["contentid"],
@@ -79,21 +94,36 @@ def build_place(
     )
 
 
-def update_place(target: Place, source: Place) -> None:
+def update_place(
+    target: Place,
+    source: Place,
+) -> None:
     """
-    같은 content_id가 이미 있을 때 원본 최신 내용으로 갱신한다.
+    같은 content_id가 이미 존재하면 최신 JSON 내용으로 갱신한다.
 
-    스크립트를 여러 번 실행해도 중복 행이 생기지 않도록 하는 처리다.
+    스크립트를 여러 번 실행해도 중복 데이터가 생기지 않는다.
     """
     for column in Place.__table__.columns:
         if column.name in {"id", "content_id"}:
             continue
-        setattr(target, column.name, getattr(source, column.name))
+
+        setattr(
+            target,
+            column.name,
+            getattr(source, column.name),
+        )
 
 
-def load_json_file(file_path: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    """JSON 파일을 읽고 최상위 메타데이터 및 items 배열을 검증한다."""
-    with file_path.open("r", encoding="utf-8") as file:
+def load_json_file(
+    file_path: Path,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """
+    JSON 파일을 읽고 최상위 구조와 items 배열을 검증한다.
+    """
+    with file_path.open(
+        "r",
+        encoding="utf-8",
+    ) as file:
         data = json.load(file)
 
     required_top_level = {
@@ -103,20 +133,26 @@ def load_json_file(file_path: Path) -> tuple[dict[str, Any], list[dict[str, Any]
         "total",
         "items",
     }
+
     missing = required_top_level - data.keys()
 
     if missing:
         raise ValueError(
-            f"{file_path.name}: 최상위 필드가 누락되었습니다: {sorted(missing)}"
+            f"{file_path.name}: "
+            f"최상위 필드가 누락되었습니다: {sorted(missing)}"
         )
 
     items = data["items"]
+
     if not isinstance(items, list):
-        raise ValueError(f"{file_path.name}: items는 배열이어야 합니다.")
+        raise ValueError(
+            f"{file_path.name}: items는 배열이어야 합니다."
+        )
 
     if data["total"] != len(items):
         raise ValueError(
-            f"{file_path.name}: total={data['total']}이지만 "
+            f"{file_path.name}: "
+            f"total={data['total']}이지만 "
             f"items 개수는 {len(items)}개입니다."
         )
 
@@ -124,7 +160,10 @@ def load_json_file(file_path: Path) -> tuple[dict[str, Any], list[dict[str, Any]
 
 
 def import_places() -> None:
-    """data/서울의 모든 JSON 파일을 data/localhub.db에 적재한다."""
+    """
+    data/서울 폴더의 모든 JSON 파일을
+    data/localhub.db의 places 테이블에 적재한다.
+    """
     if not DATA_DIR.exists():
         raise FileNotFoundError(
             f"데이터 폴더를 찾을 수 없습니다: {DATA_DIR}\n"
@@ -132,11 +171,13 @@ def import_places() -> None:
         )
 
     json_files = sorted(DATA_DIR.glob("*.json"))
+
     if not json_files:
         raise FileNotFoundError(
             f"JSON 파일을 찾을 수 없습니다: {DATA_DIR}"
         )
 
+    # 모델을 불러오고 places 테이블이 없으면 생성한다.
     init_db()
 
     inserted = 0
@@ -150,7 +191,9 @@ def import_places() -> None:
 
                 region = str(data["region"])
                 content_type = str(data["contentType"])
-                content_type_id = to_int(data["contentTypeId"])
+                content_type_id = to_int(
+                    data["contentTypeId"]
+                )
 
                 file_inserted = 0
                 file_updated = 0
@@ -158,7 +201,8 @@ def import_places() -> None:
                 for item in items:
                     if not item.get("contentid"):
                         raise ValueError(
-                            f"{file_path.name}: contentid가 없는 항목이 있습니다."
+                            f"{file_path.name}: "
+                            "contentid가 없는 항목이 있습니다."
                         )
 
                     incoming = build_place(
@@ -171,22 +215,29 @@ def import_places() -> None:
 
                     existing = session.scalar(
                         select(Place).where(
-                            Place.content_id == incoming.content_id
+                            Place.content_id
+                            == incoming.content_id
                         )
                     )
 
                     if existing is None:
                         session.add(incoming)
+
                         inserted += 1
                         file_inserted += 1
                     else:
-                        update_place(existing, incoming)
+                        update_place(
+                            existing,
+                            incoming,
+                        )
+
                         updated += 1
                         file_updated += 1
 
                     processed += 1
 
-                # 파일 단위로 flush하여 컬럼/제약조건 오류를 일찍 확인한다.
+                # 파일 단위로 SQL을 DB에 전달하여
+                # 컬럼 및 제약조건 오류를 빠르게 확인한다.
                 session.flush()
 
                 print(
@@ -196,9 +247,11 @@ def import_places() -> None:
                     f"갱신 {file_updated:,}건"
                 )
 
+            # 모든 파일이 정상 처리된 경우에만 실제 저장을 확정한다.
             session.commit()
 
         except Exception:
+            # 중간 오류가 발생하면 이번 실행의 변경 내용을 취소한다.
             session.rollback()
             raise
 
@@ -206,7 +259,10 @@ def import_places() -> None:
     print(f"처리 완료: 총 {processed:,}건")
     print(f"신규 저장: {inserted:,}건")
     print(f"기존 갱신: {updated:,}건")
-    print(f"DB 위치: {PROJECT_ROOT / 'data' / 'localhub.db'}")
+    print(
+        f"DB 위치: "
+        f"{PROJECT_ROOT / 'data' / 'localhub.db'}"
+    )
 
 
 if __name__ == "__main__":
