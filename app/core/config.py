@@ -8,11 +8,11 @@ ENV_PATH = BASE_DIR / ".env"
 
 class Settings(BaseSettings):
     # 챗봇용
-    API_ENV: str = "development"
+    API_ENV: str = "production"
     DATABASE_URL: str = "sqlite:///./data/localhub.db"
     OPENAI_API_KEY: str = ""
-    EXTERNAL_CATEGORY_API_URL: str = ""
-    DEV_MODE: str = "True"
+
+    DATA_API_URL: str = ""
 
     # 지도용
     KAKAO_REST_API_KEY: str = ""
