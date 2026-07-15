@@ -1,6 +1,8 @@
+import asyncio
 from typing import Any
 
 import httpx
+
 from fastapi import HTTPException
 
 from app.core.config import settings
@@ -15,6 +17,7 @@ from app.schemas.map import (
     RouteResponse,
     RouteSummary,
 )
+
 from app.services.route_optimizer import optimize_route_order
 
 
@@ -99,6 +102,184 @@ async def get_directions(
 
     return convert_kakao_route_response(data)
 
+
+async def get_route_cost(
+    origin: RoutePlace,
+    destination: RoutePlace,
+    priority: str = "TIME",
+) -> tuple[int, int]:
+    """
+    두 장소 사이의 카카오 자동차 경로 요약 정보를 조회합니다.
+
+    Returns:
+        tuple[int, int]:
+        distance: 거리, 미터
+        duration: 예상 소요시간, 초
+    """
+
+    if not settings.KAKAO_REST_API_KEY:
+        raise HTTPException(
+            status_code=500,
+            detail="KAKAO_REST_API_KEY가 설정되지 않았습니다.",
+        )
+
+    headers = {
+        "Authorization": (
+            f"KakaoAK {settings.KAKAO_REST_API_KEY}"
+        ),
+    }
+
+    params = {
+        "origin": (
+            f"{origin.longitude},{origin.latitude}"
+        ),
+        "destination": (
+            f"{destination.longitude},{destination.latitude}"
+        ),
+        "priority": priority,
+        # 순서 계산에는 상세 도로 정보가 필요하지 않습니다.
+        "summary": "true",
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.get(
+                KAKAO_DIRECTIONS_URL,
+                headers=headers,
+                params=params,
+            )
+
+        response.raise_for_status()
+
+    except httpx.TimeoutException as exc:
+        raise HTTPException(
+            status_code=504,
+            detail={
+                "message": "장소 간 이동시간 조회가 초과되었습니다.",
+                "origin_place_id": origin.place_id,
+                "destination_place_id": destination.place_id,
+            },
+        ) from exc
+
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "message": "카카오 이동시간 조회에 실패했습니다.",
+                "origin_place_id": origin.place_id,
+                "destination_place_id": destination.place_id,
+                "status_code": exc.response.status_code,
+                "response": exc.response.text,
+            },
+        ) from exc
+
+    except httpx.RequestError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="카카오 모빌리티 API에 연결할 수 없습니다.",
+        ) from exc
+
+    data = response.json()
+    routes = data.get("routes", [])
+
+    if not routes:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "message": "장소 사이의 자동차 경로가 없습니다.",
+                "origin_place_id": origin.place_id,
+                "destination_place_id": destination.place_id,
+            },
+        )
+
+    route = routes[0]
+
+    if route.get("result_code") != 0:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "장소 사이의 자동차 경로를 찾을 수 없습니다.",
+                "origin_place_id": origin.place_id,
+                "destination_place_id": destination.place_id,
+                "result_code": route.get("result_code"),
+                "result_msg": route.get("result_msg"),
+            },
+        )
+
+    summary = route.get("summary", {})
+
+    return (
+        summary.get("distance", 0),
+        summary.get("duration", 0),
+    )
+
+async def create_duration_matrix(
+    places: list[RoutePlace],
+    priority: str = "TIME",
+) -> dict[int, dict[int, int]]:
+    """
+    모든 장소 쌍의 자동차 예상 소요시간 행렬을 생성합니다.
+
+    예:
+    {
+        1: {1: 0, 2: 600, 3: 900},
+        2: {1: 720, 2: 0, 3: 400},
+        3: {1: 850, 2: 450, 3: 0},
+    }
+
+    소요시간 단위:
+    초
+    """
+
+    duration_matrix: dict[int, dict[int, int]] = {
+        place.place_id: {}
+        for place in places
+    }
+
+    # 카카오 API에 지나치게 많은 요청이 한꺼번에
+    # 전달되지 않도록 동시 호출 수를 제한합니다.
+    semaphore = asyncio.Semaphore(5)
+
+    async def fetch_duration(
+        origin: RoutePlace,
+        destination: RoutePlace,
+    ) -> tuple[int, int, int]:
+        if origin.place_id == destination.place_id:
+            return (
+                origin.place_id,
+                destination.place_id,
+                0,
+            )
+
+        async with semaphore:
+            _, duration = await get_route_cost(
+                origin=origin,
+                destination=destination,
+                priority=priority,
+            )
+
+        return (
+            origin.place_id,
+            destination.place_id,
+            duration,
+        )
+
+    tasks = [
+        fetch_duration(origin, destination)
+        for origin in places
+        for destination in places
+        if origin.place_id != destination.place_id
+    ]
+
+    results = await asyncio.gather(*tasks)
+
+    for origin_id, destination_id, duration in results:
+        duration_matrix[origin_id][destination_id] = duration
+
+    for place in places:
+        duration_matrix[place.place_id][place.place_id] = 0
+
+    return duration_matrix
 
 def convert_kakao_route_response(
     data: dict[str, Any],
@@ -190,7 +371,15 @@ async def get_multi_directions(
             detail="KAKAO_REST_API_KEY가 설정되지 않았습니다.",
         )
 
-    places = optimize_route_order(request.places)
+    duration_matrix = await create_duration_matrix(
+        places=request.places,
+        priority="TIME",
+    )
+
+    places = optimize_route_order(
+        places=request.places,
+        duration_matrix=duration_matrix,
+    )
 
     origin = places[0]
     destination = places[-1]
