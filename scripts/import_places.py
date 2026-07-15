@@ -19,17 +19,35 @@ from app.models.place import Place  # noqa: E402
 DATA_DIR = PROJECT_ROOT / "data" / "서울"
 
 
+def clean_string(value: Any) -> str:
+    """
+    JSON 값을 문자열로 정리한다.
+
+    None은 빈 문자열로 변환하고,
+    문자열 앞뒤의 불필요한 공백을 제거한다.
+    """
+    if value is None:
+        return ""
+
+    return str(value).strip()
+
+
 def to_float(value: Any) -> float | None:
     """
     좌표 문자열을 실수로 변환한다.
 
     빈 문자열이나 None은 좌표가 없는 것으로 보고 None을 반환한다.
     """
-    if value is None or value == "":
+    if value is None:
+        return None
+
+    cleaned_value = str(value).strip()
+
+    if not cleaned_value:
         return None
 
     try:
-        return float(value)
+        return float(cleaned_value)
     except (TypeError, ValueError) as exc:
         raise ValueError(
             f"좌표를 숫자로 변환할 수 없습니다: {value!r}"
@@ -37,9 +55,21 @@ def to_float(value: Any) -> float | None:
 
 
 def to_int(value: Any) -> int:
-    """contentTypeId처럼 정수로 사용할 값을 안전하게 변환한다."""
+    """
+    contentTypeId처럼 정수로 사용할 값을 안전하게 변환한다.
+    """
+    if value is None:
+        raise ValueError("정수로 변환할 값이 없습니다.")
+
+    cleaned_value = str(value).strip()
+
+    if not cleaned_value:
+        raise ValueError(
+            f"빈 값을 정수로 변환할 수 없습니다: {value!r}"
+        )
+
     try:
-        return int(value)
+        return int(cleaned_value)
     except (TypeError, ValueError) as exc:
         raise ValueError(
             f"정수로 변환할 수 없습니다: {value!r}"
@@ -56,40 +86,146 @@ def build_place(
 ) -> Place:
     """
     TourAPI JSON 항목 하나를 Place SQLAlchemy 객체로 변환한다.
+
+    일반 장소 데이터에는 축제 상세 필드가 없으므로
+    해당 필드는 빈 문자열로 저장된다.
     """
-    item_type_id = item.get(
-        "contenttypeid",
-        content_type_id,
-    )
+    # 항목의 contenttypeid가 빈 문자열이면
+    # JSON 최상위 contentTypeId를 사용한다.
+    item_type_id = item.get("contenttypeid")
+
+    if item_type_id is None or not str(item_type_id).strip():
+        item_type_id = content_type_id
 
     return Place(
-        content_id=item["contentid"],
+        # TourAPI 식별 정보
+        content_id=clean_string(item["contentid"]),
         content_type_id=to_int(item_type_id),
-        region=region,
-        content_type=content_type,
-        title=item.get("title", ""),
-        address=item.get("addr1", ""),
-        address_detail=item.get("addr2", ""),
-        zipcode=item.get("zipcode", ""),
-        telephone=item.get("tel", ""),
+        region=clean_string(region),
+        content_type=clean_string(content_type),
+
+        # 장소 기본 정보
+        title=clean_string(item.get("title")),
+
+        # 주소
+        address=clean_string(item.get("addr1")),
+        address_detail=clean_string(item.get("addr2")),
+        zipcode=clean_string(item.get("zipcode")),
+
+        # 연락처
+        telephone=clean_string(item.get("tel")),
+
+        # 위치
         longitude=to_float(item.get("mapx")),
         latitude=to_float(item.get("mapy")),
-        map_level=item.get("mlevel", ""),
-        area_code=item.get("areacode", ""),
-        sigungu_code=item.get("sigungucode", ""),
-        legal_region_code=item.get("lDongRegnCd", ""),
-        legal_sigungu_code=item.get("lDongSignguCd", ""),
-        category1=item.get("cat1", ""),
-        category2=item.get("cat2", ""),
-        category3=item.get("cat3", ""),
-        classification1=item.get("lclsSystm1", ""),
-        classification2=item.get("lclsSystm2", ""),
-        classification3=item.get("lclsSystm3", ""),
-        image_url=item.get("firstimage", ""),
-        thumbnail_url=item.get("firstimage2", ""),
-        copyright_type=item.get("cpyrhtDivCd", ""),
-        source_created_at=item.get("createdtime", ""),
-        source_modified_at=item.get("modifiedtime", ""),
+        map_level=clean_string(item.get("mlevel")),
+
+        # 지역 코드
+        area_code=clean_string(item.get("areacode")),
+        sigungu_code=clean_string(item.get("sigungucode")),
+        legal_region_code=clean_string(
+            item.get("lDongRegnCd")
+        ),
+        legal_sigungu_code=clean_string(
+            item.get("lDongSignguCd")
+        ),
+
+        # 관광 분류
+        category1=clean_string(item.get("cat1")),
+        category2=clean_string(item.get("cat2")),
+        category3=clean_string(item.get("cat3")),
+        classification1=clean_string(
+            item.get("lclsSystm1")
+        ),
+        classification2=clean_string(
+            item.get("lclsSystm2")
+        ),
+        classification3=clean_string(
+            item.get("lclsSystm3")
+        ),
+
+        # 이미지
+        image_url=clean_string(item.get("firstimage")),
+        thumbnail_url=clean_string(
+            item.get("firstimage2")
+        ),
+
+        # 저작권
+        copyright_type=clean_string(
+            item.get("cpyrhtDivCd")
+        ),
+
+        # 축제·공연·행사 상세 정보
+        event_start_date=clean_string(
+            item.get("eventstartdate")
+        ),
+        event_end_date=clean_string(
+            item.get("eventenddate")
+        ),
+        event_place=clean_string(
+            item.get("eventplace")
+        ),
+        play_time=clean_string(
+            item.get("playtime")
+        ),
+        program=clean_string(
+            item.get("program")
+        ),
+        sub_event=clean_string(
+            item.get("subevent")
+        ),
+
+        # 주최·주관
+        sponsor1=clean_string(
+            item.get("sponsor1")
+        ),
+        sponsor1_telephone=clean_string(
+            item.get("sponsor1tel")
+        ),
+        sponsor2=clean_string(
+            item.get("sponsor2")
+        ),
+        sponsor2_telephone=clean_string(
+            item.get("sponsor2tel")
+        ),
+
+        # 홈페이지 및 예매
+        event_homepage=clean_string(
+            item.get("eventhomepage")
+        ),
+        booking_place=clean_string(
+            item.get("bookingplace")
+        ),
+
+        # 관람 및 이용 정보
+        age_limit=clean_string(
+            item.get("agelimit")
+        ),
+        festival_grade=clean_string(
+            item.get("festivalgrade")
+        ),
+        place_info=clean_string(
+            item.get("placeinfo")
+        ),
+        spend_time_festival=clean_string(
+            item.get("spendtimefestival")
+        ),
+        discount_info_festival=clean_string(
+            item.get("discountinfofestival")
+        ),
+        use_time_festival=clean_string(
+            item.get("usetimefestival")
+        ),
+
+        # TourAPI 원본 생성·수정 시간
+        source_created_at=clean_string(
+            item.get("createdtime")
+        ),
+        source_modified_at=clean_string(
+            item.get("modifiedtime")
+        ),
+
+        # 데이터 출처
         source_file=source_file,
     )
 
@@ -101,10 +237,18 @@ def update_place(
     """
     같은 content_id가 이미 존재하면 최신 JSON 내용으로 갱신한다.
 
-    스크립트를 여러 번 실행해도 중복 데이터가 생기지 않는다.
+    id, content_id와 서비스 생성·수정 시간은
+    새 Place 객체의 값으로 덮어쓰지 않는다.
     """
+    excluded_columns = {
+        "id",
+        "content_id",
+        "created_at",
+        "updated_at",
+    }
+
     for column in Place.__table__.columns:
-        if column.name in {"id", "content_id"}:
+        if column.name in excluded_columns:
             continue
 
         setattr(
@@ -125,6 +269,12 @@ def load_json_file(
         encoding="utf-8",
     ) as file:
         data = json.load(file)
+
+    if not isinstance(data, dict):
+        raise ValueError(
+            f"{file_path.name}: "
+            "JSON 최상위 데이터는 객체여야 합니다."
+        )
 
     required_top_level = {
         "region",
@@ -149,10 +299,17 @@ def load_json_file(
             f"{file_path.name}: items는 배열이어야 합니다."
         )
 
-    if data["total"] != len(items):
+    try:
+        total = to_int(data["total"])
+    except ValueError as exc:
+        raise ValueError(
+            f"{file_path.name}: total 값이 올바르지 않습니다."
+        ) from exc
+
+    if total != len(items):
         raise ValueError(
             f"{file_path.name}: "
-            f"total={data['total']}이지만 "
+            f"total={total}이지만 "
             f"items 개수는 {len(items)}개입니다."
         )
 
@@ -163,6 +320,9 @@ def import_places() -> None:
     """
     data/서울 폴더의 모든 JSON 파일을
     data/localhub.db의 places 테이블에 적재한다.
+
+    content_id가 이미 존재하면 기존 데이터를 갱신하고,
+    존재하지 않으면 새 장소로 저장한다.
     """
     if not DATA_DIR.exists():
         raise FileNotFoundError(
@@ -189,8 +349,10 @@ def import_places() -> None:
             for file_path in json_files:
                 data, items = load_json_file(file_path)
 
-                region = str(data["region"])
-                content_type = str(data["contentType"])
+                region = clean_string(data["region"])
+                content_type = clean_string(
+                    data["contentType"]
+                )
                 content_type_id = to_int(
                     data["contentTypeId"]
                 )
@@ -198,11 +360,37 @@ def import_places() -> None:
                 file_inserted = 0
                 file_updated = 0
 
-                for item in items:
-                    if not item.get("contentid"):
+                for item_index, item in enumerate(
+                    items,
+                    start=1,
+                ):
+                    if not isinstance(item, dict):
                         raise ValueError(
                             f"{file_path.name}: "
-                            "contentid가 없는 항목이 있습니다."
+                            f"{item_index}번째 항목은 "
+                            "객체 형식이어야 합니다."
+                        )
+
+                    content_id = clean_string(
+                        item.get("contentid")
+                    )
+
+                    if not content_id:
+                        raise ValueError(
+                            f"{file_path.name}: "
+                            f"{item_index}번째 항목에 "
+                            "contentid가 없습니다."
+                        )
+
+                    title = clean_string(
+                        item.get("title")
+                    )
+
+                    if not title:
+                        raise ValueError(
+                            f"{file_path.name}: "
+                            f"contentid={content_id} 항목에 "
+                            "title이 없습니다."
                         )
 
                     incoming = build_place(
@@ -260,7 +448,7 @@ def import_places() -> None:
     print(f"신규 저장: {inserted:,}건")
     print(f"기존 갱신: {updated:,}건")
     print(
-        f"DB 위치: "
+        "DB 위치: "
         f"{PROJECT_ROOT / 'data' / 'localhub.db'}"
     )
 

@@ -6,6 +6,7 @@ from app.schemas.place import (
     PlaceDetailResponse,
     PlaceListResponse,
 )
+
 from app.services.place_service import (
     get_place_by_id,
     get_places,
