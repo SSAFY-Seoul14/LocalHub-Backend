@@ -3,7 +3,7 @@ from collections.abc import AsyncIterator
 
 from fastapi import FastAPI
 
-from app.api.routes import health, posts, places
+from app.api.routes import health, posts, places, chat
 from app.db.database import init_db
 
 from fastapi.middleware.cors import CORSMiddleware
@@ -42,7 +42,7 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(posts.router)
 app.include_router(places.router)
-
+app.include_router(chat.router, prefix="/api", tags = ["Chat"])  
 
 @app.get(
     "/",
