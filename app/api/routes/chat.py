@@ -1,5 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from app.schemas.chat import ChatRequest, ChatResponse
+from app.services.chatplace_service import fetch_seoul_places
+from app.services.chat_service import generate_ai_response
 from typing import Optional
 
 router = APIRouter()
@@ -56,23 +58,19 @@ async def chat_endpoint(payload: ChatRequest):
         else:
             print(f"[DEBUG] -> Categorized directly by Quick Chip: {category}")
 
-        # 3. 임시 비즈니스 로직 연동용 응답 메시지 생성
-        # TODOl: 실제 외부 API 연동 및 OpenAI 연동 후, 아래 로직을 제거하고 실제 답변을 반환하도록 수정 필요
-        if category:
-            dummy_answer = (
-                f"분석 결과, 현재 질문은 '{category}' 카테고리로 분류되었습니다.\n"
-                f"곧 이 카테고리에 알맞은 외부 API 실시간 데이터를 연동하여 답변을 고도화해 드릴 예정입니다!"
-            )
-        else:
-            dummy_answer = (
-                "질문에서 특정 카테고리를 유추하지 못해 일반 대화 모드로 처리합니다.\n"
-                "혹은 서울 가이드와 관련된 다양한 지식을 답변해 드립니다."
-            )
+        # 2. [실제 연동] 비동기 함수로 배포된 서버에서 실시간 장소를 불러옴.
+        seoul_realtime_data = await fetch_seoul_places(category)
+        print(f"[DEBUG] Realtime Data Fetched:\n{seoul_realtime_data}")
+
+        # 3. 수집한 실시간 데이터와 대화 맥락을 OpenAI GPT에 전달하여 답변 생성
+        ai_answer = generate_ai_response(payload.history, category, seoul_realtime_data)
 
         return ChatResponse(
-            answer=dummy_answer,
+            answer=ai_answer,
             success=True
         )
+
+        
         
     except Exception as e:
         print(f"[ERROR] Chat Endpoint Error: {str(e)}")
