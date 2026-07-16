@@ -11,7 +11,7 @@ CATEGORY_TO_CONTENT_TYPE = {
     "shopping": "쇼핑",
     "accommodation": "숙박",
     "itinerary": "여행코스",
-    "event": "축제공연"
+    "event": "축제공연행사"
 }
 
 async def fetch_seoul_places(category: Optional[str] = None, query: Optional[str] = None) -> str:
