@@ -75,7 +75,7 @@ def analyze_user_intent(text: str, history: list) -> Tuple[Optional[str], Option
     return detected_category, detected_gu
 
 
-@router.post("/chat", response_model=ChatResponse, summary="LocalHub AI 가이드 질의응답")
+@router.post("/api/chat", response_model=ChatResponse, summary="LocalHub AI 가이드 질의응답")
 async def chat_endpoint(payload: ChatRequest):
     try:
         user_message = payload.history[-1].content if payload.history else ""
