@@ -34,7 +34,7 @@ def generate_ai_response(
             "## [역할 및 지침]\n"
             "너는 서울 방문객을 위한 전문 가이드 'LocalHub AI'야.\n"
             "아래 제공되는 [실시간 서울 데이터] 목록의 장소들을 '무조건' 최우선으로 매칭하여 답변을 작성해야 해.\n"
-            "제공된 실시간 데이터 장소 외에 니가 임의로 유명한 명소들을 머릿속에서 창작해 장황하게 설명하지 마.\n\n"
+            "제공된 실시간 데이터 장소 외에 네가 임의로 유명한 명소들을 머릿속에서 창작해 장황하게 설명하지 마.\n\n"
             
             f"{SECURITY_GUARDRAILS}"  # 보안 가드레일 주입
             
@@ -45,13 +45,19 @@ def generate_ai_response(
             "[질문에 어울리는 환영 멘트 및 핵심 설명 1~2줄]\n\n"
             
             "### 📍 추천 실시간 핫플레이스\n"
-            "*   **[장소명]** (카테고리)\n"
-            "    *   *위치:* [장소의 실제 주소]\n"
-            "    *   *가이드 한줄 팁:* [이 장소가 추천 질문과 어울리는 이유 및 꿀팁 1줄]\n"
-            "*   **[장소명2]** ...\n\n"
+            "**[장소명]**\n"
+            "📍 *위치:* [장소의 실제 주소]\n"
+            "💡 *가이드 한줄 팁:* [이 장소가 추천 질문과 어울리는 이유 및 꿀팁 1줄]\n"
+            "<button class=\"spot-go-btn\" data-id=\"[해당 장소의 실제 contentId]\">🗺️ 이 장소 지도에서 보기</button>\n\n"
+            "**[장소명2]** ...\n\n"
             
             "### 🗺️ 추천 추천 동선 가이드\n"
             "[위 추천 장소들을 엮어 이용하기 좋은 상황이나 방문 순서 꿀팁을 친절하고 짧게 2~3줄로 설명]\n\n"
+            
+            "## [데이터 매핑 주의사항]\n"
+            "제공되는 [실시간 서울 데이터] 목록을 보면 각 장소 정보 맨 뒤에 'contentId: [숫자]'가 명시되어 있어.\n"
+            "추천 목록의 각 장소 줄을 작성할 때, 반드시 해당 장소 정보 뒤에 붙어 있는 정확한 contentId 값을 그대로 가져와서 <button class=\"spot-go-btn\" data-id=\"[contentId]\">지도에서 보기</button> 형식의 data-id 값에 주입해 줘야 해.\n"
+            "절대로 임의의 숫자를 지어내거나 다른 장소의 contentId와 헷갈려 매핑하면 안 돼.\n\n"
             
             f"## [실시간 서울 데이터]\n{real_data}\n\n"
             "## [사용자 질문]\n"
@@ -86,7 +92,7 @@ def generate_ai_response(
 
     try:
         response = client.chat.completions.create(
-            model=os.getenv("OPENAI_MODEL", "gpt-5-mini"), # 원래 쓰시던 코드 그대로 모델명 파라미터 복구
+            model=os.getenv("OPENAI_MODEL", "gpt-5-mini"),
             messages=messages     
         )
         return response.choices[0].message.content
