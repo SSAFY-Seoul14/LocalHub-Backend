@@ -84,8 +84,8 @@ def format_places_data(places_list: List[Dict[str, Any]]) -> str:
         title = place.get("title", "정보 없음")
         content_type = place.get("content_type", "추천 정보")
         address = place.get("address", "").replace("서울특별시 ", "") # 가독성을 위해 '서울특별시' 생략
-        
+        content_id = place.get("contentid") or place.get("content_id") or place.get("contentId") or "0"
         # OpenAI가 자치구 정보를 확실하게 인지할 수 있도록 가공
-        formatted_items.append(f"- [{content_type}] {title} (위치: {address})")
+        formatted_items.append(f"- [{content_type}] {title} (위치: {address}, contentId: {content_id})")
         
     return "\n".join(formatted_items)
