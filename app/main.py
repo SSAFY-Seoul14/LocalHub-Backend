@@ -44,7 +44,7 @@ app.include_router(posts.router)
 app.include_router(places.router)
 app.include_router(routes.router)
 app.include_router(maps.router)
-app.include_router(chat.router, prefix="/api", tags = ["Chat"])  
+app.include_router(chat.router, tags = ["Chat"])  
 
 @app.get(
     "/",
