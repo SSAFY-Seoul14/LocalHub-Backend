@@ -80,3 +80,42 @@ def get_place_by_id(
     )
 
     return db.scalar(statement)
+
+
+
+def get_places_by_content_ids(
+    db: Session,
+    content_ids: list[str],
+) -> list[Place]:
+    """
+    여러 content_id에 해당하는 장소들을 한 번에 조회한다.
+
+    반환 순서는 요청받은 content_ids 순서를 유지한다.
+    """
+
+    if not content_ids:
+        return []
+
+    unique_content_ids = list(
+        dict.fromkeys(content_ids)
+    )
+
+    statement = select(Place).where(
+        Place.content_id.in_(unique_content_ids)
+    )
+
+    places = list(
+        db.scalars(statement).all()
+    )
+
+    place_map = {
+        place.content_id: place
+        for place in places
+    }
+
+    return [
+        place_map[content_id]
+        for content_id in unique_content_ids
+        if content_id in place_map
+    ]
+

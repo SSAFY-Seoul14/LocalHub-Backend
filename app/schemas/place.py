@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class PlaceBase(BaseModel):
@@ -109,3 +109,23 @@ class PlaceDetailResponse(PlaceBase):
     # 서비스 생성 및 수정 시각
     created_at: datetime
     updated_at: datetime
+
+
+class PlaceBatchRequest(BaseModel):
+    """
+    여러 장소 상세 조회 요청
+    """
+
+    content_ids: list[str] = Field(
+        ...,
+        min_length=1,
+        max_length=30,
+        description="조회할 장소의 content_id 목록",
+        examples=[
+            [
+                "2723499",
+                "3532906",
+                "2384832",
+            ]
+        ],
+    )
